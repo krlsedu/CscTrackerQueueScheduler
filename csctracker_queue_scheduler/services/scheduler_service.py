@@ -45,7 +45,7 @@ class SchedulerService:
     def start_scheduled_job(function,
                             args=None,
                             period=5,
-                            time_hh_mm="04:00",
+                            time_hh_mm=None,
                             time_unit: TimeUnit = TimeUnit.MINUTES):
         if SchedulerService.__queue_service is None:
             SchedulerService.init()
@@ -69,10 +69,12 @@ class SchedulerService:
         elif time_unit == TimeUnit.WEEKS:
             schedule.every(period).weeks.do(SchedulerService.put_in_queue, function, args, True)
         elif time_unit == TimeUnit.DAILY:
+            if time_hh_mm is None:
+                time_hh_mm = period
             schedule.every().day.at(time_hh_mm).do(SchedulerService.put_in_queue, function, args, True)
         else:
             raise Exception(f"Inválid time unit -> {time_unit}")
-        if time_unit != 'daily':
+        if time_unit != TimeUnit.DAILY:
             SchedulerService.__logger.info(
                 f"Job {Utils.get_friendly_method_name(function)}({args if args else ''}) scheduled to run every {period} {time_unit.value}")
         else:
