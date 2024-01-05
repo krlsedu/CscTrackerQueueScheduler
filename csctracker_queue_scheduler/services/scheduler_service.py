@@ -4,6 +4,7 @@ import time
 
 import schedule
 
+from csctracker_queue_scheduler.models.enums.time_unit import TimeUnit
 from csctracker_queue_scheduler.models.generic_data_dto import GenericDataDTO
 from csctracker_queue_scheduler.services.queue_service import QueueService
 from csctracker_queue_scheduler.utils.utils import Utils
@@ -27,29 +28,37 @@ class SchedulerService:
                 pass
         pass
 
-    def start_scheduled_job(self, function, args=None, period=5, time_hh_mm="04:00", trigger='minutes'):
+    def start_scheduled_job(self,
+                            function,
+                            args=None,
+                            period=5,
+                            time_hh_mm="04:00",
+                            time_unit: TimeUnit = TimeUnit.MINUTES):
         thread = threading.Thread(target=self.start_scheduler,
-                                  args=(function, args, period, time_hh_mm, trigger))
+                                  args=(function, args, period, time_hh_mm, time_unit))
         thread.start()
 
-    def start_scheduler(self, function, args=None, period=5, time_hh_mm=None, trigger='minutes'):
+    def start_scheduler(self, function, args=None, period=5, time_hh_mm=None,
+                        time_unit: TimeUnit = TimeUnit.MINUTES):
         if args is None:
             args = {}
-        if trigger == 'seconds':
+        if time_unit == TimeUnit.SECONDS:
             schedule.every(period).seconds.do(self.put_in_queue, function, args, True)
-        elif trigger == 'minutes':
+        elif time_unit == TimeUnit.MINUTES:
             schedule.every(period).minutes.do(self.put_in_queue, function, args, True)
-        elif trigger == 'hours':
+        elif time_unit == TimeUnit.HOURS:
             schedule.every(period).hours.do(self.put_in_queue, function, args, True)
-        elif trigger == 'days':
+        elif time_unit == TimeUnit.DAYS:
             schedule.every(period).days.do(self.put_in_queue, function, args, True)
-        elif trigger == 'weeks':
+        elif time_unit == TimeUnit.WEEKS:
             schedule.every(period).weeks.do(self.put_in_queue, function, args, True)
-        elif trigger == 'daily':
+        elif time_unit == TimeUnit.DAILY:
             schedule.every().day.at(time_hh_mm).do(self.put_in_queue, function, args, True)
-        if trigger != 'daily':
+        else:
+            raise Exception(f"Inválid time unit -> {time_unit}")
+        if time_unit != 'daily':
             self.logger.info(
-                f"Job {Utils.get_friendly_method_name(function)}({args if args else ''}) scheduled to run every {period} {trigger}")
+                f"Job {Utils.get_friendly_method_name(function)}({args if args else ''}) scheduled to run every {period} {time_unit.value}")
         else:
             self.logger.info(
                 f"Job {Utils.get_friendly_method_name(function)}({args if args else ''}) scheduled to run at {time_hh_mm}")

@@ -1,4 +1,4 @@
-from app.models.base_dto import BaseDTO
+from csctracker_queue_scheduler.models.base_dto import BaseDTO
 
 
 class GenericDataDTO(BaseDTO):
