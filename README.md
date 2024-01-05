@@ -28,16 +28,14 @@ COMING SOON
 
 ```python 
 from csctracker_queue_scheduler.models.enums.time_unit import TimeUnit
-from csctracker_queue_scheduler.services.queue_service import QueueService
 from csctracker_queue_scheduler.services.scheduler_service import SchedulerService
 
 
 def my_function(): print("Hello, world!")
 
 
-scheduler = SchedulerService(queue_service=QueueService(), services=[])
-scheduler.start_scheduled_job(
-    function=my_function, period=5, time_unit=TimeUnit.MINUTES)
+SchedulerService.start_scheduled_job(
+  function=my_function, period=5, time_unit=TimeUnit.SECONDS)
 ```
 
 In the above example, `my_function` would be scheduled to run every 5 minutes.

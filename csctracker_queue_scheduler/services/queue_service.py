@@ -1,4 +1,5 @@
 import logging
+import os
 import queue
 import threading
 import time
@@ -9,11 +10,14 @@ from csctracker_queue_scheduler.utils import Utils
 
 
 class QueueService:
-    def __init__(self, num_threads: int = 10):
+    def __init__(self, threads: int = None):
         self.logger = logging.getLogger()
+        if threads is None:
+            threads = int(os.getenv("NUM_THREADS", 10))
+        self.logger.debug(f"NUM_THREADS={threads}")
         self.normal_queue = Queue()
         self.priority_queue = Queue()
-        self.init_threads(num_threads)
+        self.init_threads(threads)
 
     def init_threads(self, num_threads):
         for i in range(num_threads):

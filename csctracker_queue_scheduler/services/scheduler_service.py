@@ -11,59 +11,76 @@ from csctracker_queue_scheduler.utils.utils import Utils
 
 
 class SchedulerService:
-    def __init__(self, queue_service: QueueService, services: list):
-        self.logger = logging.getLogger()
-        self.queue_service = queue_service
-        self.services = services
-        self.services.append(self.queue_service)
-        threading.Thread(target=self.worker).start()
+    __queue_service = None
+    __logger = logging.getLogger()
+    __services = []
 
-    def worker(self):
+    @staticmethod
+    def init(threads: int = None, services: list = []):
+        SchedulerService.__queue_service = QueueService(threads=threads)
+        SchedulerService.__services = services
+        SchedulerService.__services.append(SchedulerService.__queue_service)
+        threading.Thread(target=SchedulerService.__worker).start()
+
+    @staticmethod
+    def get_queue_service():
+        return SchedulerService.__queue_service
+
+    @staticmethod
+    def add_services(services: list):
+        SchedulerService.__services.append(services)
+
+    @staticmethod
+    def __worker():
         while True:
             try:
                 schedule.run_pending()
                 time.sleep(1)
             except Exception as e:
-                self.logger.error(e)
+                SchedulerService.__logger.error(e)
                 pass
         pass
 
-    def start_scheduled_job(self,
-                            function,
+    @staticmethod
+    def start_scheduled_job(function,
                             args=None,
                             period=5,
                             time_hh_mm="04:00",
                             time_unit: TimeUnit = TimeUnit.MINUTES):
-        thread = threading.Thread(target=self.start_scheduler,
+        if SchedulerService.__queue_service is None:
+            SchedulerService.init()
+        thread = threading.Thread(target=SchedulerService.__start_scheduler,
                                   args=(function, args, period, time_hh_mm, time_unit))
         thread.start()
 
-    def start_scheduler(self, function, args=None, period=5, time_hh_mm=None,
-                        time_unit: TimeUnit = TimeUnit.MINUTES):
+    @staticmethod
+    def __start_scheduler(function, args=None, period=5, time_hh_mm=None,
+                          time_unit: TimeUnit = TimeUnit.MINUTES):
         if args is None:
             args = {}
         if time_unit == TimeUnit.SECONDS:
-            schedule.every(period).seconds.do(self.put_in_queue, function, args, True)
+            schedule.every(period).seconds.do(SchedulerService.put_in_queue, function, args, True)
         elif time_unit == TimeUnit.MINUTES:
-            schedule.every(period).minutes.do(self.put_in_queue, function, args, True)
+            schedule.every(period).minutes.do(SchedulerService.put_in_queue, function, args, True)
         elif time_unit == TimeUnit.HOURS:
-            schedule.every(period).hours.do(self.put_in_queue, function, args, True)
+            schedule.every(period).hours.do(SchedulerService.put_in_queue, function, args, True)
         elif time_unit == TimeUnit.DAYS:
-            schedule.every(period).days.do(self.put_in_queue, function, args, True)
+            schedule.every(period).days.do(SchedulerService.put_in_queue, function, args, True)
         elif time_unit == TimeUnit.WEEKS:
-            schedule.every(period).weeks.do(self.put_in_queue, function, args, True)
+            schedule.every(period).weeks.do(SchedulerService.put_in_queue, function, args, True)
         elif time_unit == TimeUnit.DAILY:
-            schedule.every().day.at(time_hh_mm).do(self.put_in_queue, function, args, True)
+            schedule.every().day.at(time_hh_mm).do(SchedulerService.put_in_queue, function, args, True)
         else:
             raise Exception(f"Inválid time unit -> {time_unit}")
         if time_unit != 'daily':
-            self.logger.info(
+            SchedulerService.__logger.info(
                 f"Job {Utils.get_friendly_method_name(function)}({args if args else ''}) scheduled to run every {period} {time_unit.value}")
         else:
-            self.logger.info(
+            SchedulerService.__logger.info(
                 f"Job {Utils.get_friendly_method_name(function)}({args if args else ''}) scheduled to run at {time_hh_mm}")
 
-    def init_job(self, function, args=None, priority_job=False, class_name=None, async_job=True) -> GenericDataDTO:
+    @staticmethod
+    def init_job(function, args=None, priority_job=False, class_name=None, async_job=True) -> GenericDataDTO:
         executed = False
         if args is None:
             args = {}
@@ -75,22 +92,22 @@ class SchedulerService:
             del args['async_job']
         if '.' in function:
             classe, method = function.split('.')
-            instance = self.get_instance_by_class_name(classe)
+            instance = SchedulerService.get_instance_by_class_name(classe)
             if instance is not None:
                 call_method = SchedulerService.call_method(instance, method)
                 if async_job:
-                    self.queue_service.put(call_method, priority_job, **args)
+                    SchedulerService.__queue_service.put(call_method, priority_job, **args)
                 else:
                     ret_ = call_method(**args)
                     return GenericDataDTO(msg=ret_)
                 executed = True
         else:
             if class_name is not None:
-                instance = self.get_instance_by_class_name(class_name)
+                instance = SchedulerService.get_instance_by_class_name(class_name)
                 if instance is not None:
                     service_call_method = SchedulerService.call_method(instance, function)
                     if async_job:
-                        self.queue_service.put(service_call_method, priority_job, **args)
+                        SchedulerService.__queue_service.put(service_call_method, priority_job, **args)
                     else:
                         ret_ = service_call_method(**args)
                         return GenericDataDTO(msg=ret_)
@@ -106,12 +123,25 @@ class SchedulerService:
         method = getattr(instance, method_name)
         return method
 
-    def put_in_queue(self, function, args=None, priority=False):
-        self.queue_service.put(function, priority, **args)
+    @staticmethod
+    def put_in_queue(function, args=None, priority=False):
+        SchedulerService.__queue_service.put(function, priority, **args)
 
-    def get_instance_by_class_name(self, class_name):
+    @staticmethod
+    def get_instance_by_class_name(class_name):
         class_name = Utils.snake_to_camel(class_name)
-        for instance in self.services:
+        for instance in SchedulerService.__services:
             if type(instance).__name__ == class_name:
                 return instance
         return None
+
+
+def scheduled_job(args=None,
+                  period=5,
+                  time_hh_mm="04:00",
+                  time_unit: TimeUnit = TimeUnit.MINUTES):
+    def decorator(func):
+        SchedulerService.start_scheduled_job(func, args, period, time_hh_mm, time_unit)
+        return func
+
+    return decorator
