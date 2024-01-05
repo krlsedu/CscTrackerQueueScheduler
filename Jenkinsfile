@@ -46,7 +46,7 @@ pipeline {
             steps {
                 script {
                     echo 'RELEASE_COMMIT ' + env.RELEASE_COMMIT
-                    if (env.BRANCH_NAME == 'main') {
+                    if (env.BRANCH_NAME == 'master') {
                         echo 'Master'
                         VERSION = VersionNumber(versionNumberString: '${BUILD_DATE_FORMATTED, "yy"}.${BUILD_WEEK,XX}.${BUILDS_THIS_WEEK,XXX}')
                     } else {
@@ -90,7 +90,7 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: 'gitHub', passwordVariable: 'password', usernameVariable: 'user')]) {
                         script {
                             echo "Commiting version"
-                            if (env.BRANCH_NAME == 'main') {
+                            if (env.BRANCH_NAME == 'master') {
                                 sh 'git pull https://krlsedu:${password}@github.com/krlsedu/' + env.REPOSITORY_NAME + '.git HEAD:' + env.BRANCH_NAME
                                 sh 'echo ' + env.VERSION_NAME + ' > version.txt'
                                 sh "git diff"
