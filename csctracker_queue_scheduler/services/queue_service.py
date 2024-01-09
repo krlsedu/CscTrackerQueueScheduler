@@ -3,7 +3,10 @@ import os
 import queue
 import threading
 import time
+import uuid
 from queue import Queue
+
+from flask import g
 
 from csctracker_queue_scheduler.models.generic_data_dto import GenericDataDTO
 from csctracker_queue_scheduler.utils import Utils
@@ -41,7 +44,9 @@ class QueueService:
                 self.logger.error(f"Error in priority queue: {e}")
 
     def __run_job(self, queue, type):
-        func_, args_ = queue.get_nowait()
+        func_, args_, correlation_id = queue.get_nowait()
+        local = threading.current_thread()
+        local.__setattr__('correlation_id', correlation_id)
         if func_ is not None:
             if not args_:
                 args_ = None
@@ -80,7 +85,11 @@ class QueueService:
                 GenericDataDTO(msg=f"Priority queues: {self.priority_queue.qsize()}")]
 
     def put(self, func, priority=False, **args):
+        try:
+            correlation_id = g.correlation_id
+        except:
+            correlation_id = str(uuid.uuid4())
         if priority:
-            self.priority_queue.put((func, args))
+            self.priority_queue.put((func, args, correlation_id))
         else:
-            self.normal_queue.put((func, args))
+            self.normal_queue.put((func, args, correlation_id))
