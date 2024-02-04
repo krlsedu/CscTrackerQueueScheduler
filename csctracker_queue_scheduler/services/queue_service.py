@@ -51,15 +51,21 @@ class QueueService:
             if not args_:
                 args_ = None
             self.logger.info(
+                f"Executing in {type} queue {Utils.get_friendly_method_name(func_)}")
+            self.logger.debug(
                 f"Executing in {type} queue {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''})")
             if args_ is not None:
-                self.logger.info(
-                    f"Return of {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''}) -> {func_(**args_)}")
+                ret_ = func_(**args_)
+                self.logger.debug(
+                    f"Return of {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''}) -> {ret_}")
             else:
-                self.logger.info(
-                    f"Return of {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''}) -> {func_()}")
+                ret_ = func_()
+                self.logger.debug(
+                    f"Return of {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''}) -> {ret_}")
             queue.task_done()
             self.logger.info(
+                f"Executed in {type} queue {Utils.get_friendly_method_name(func_)}")
+            self.logger.debug(
                 f"Executed in {type} queue {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''})")
 
     def clean_queue(self) -> GenericDataDTO:
