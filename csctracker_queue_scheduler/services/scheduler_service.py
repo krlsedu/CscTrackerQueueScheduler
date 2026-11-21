@@ -14,13 +14,23 @@ class SchedulerService:
     __queue_service = None
     __logger = logging.getLogger()
     __services = []
+    __worker_started = False
+    __worker_lock = threading.Lock()
 
     @staticmethod
-    def init(threads: int = None, services: list = []):
+    def init(threads: int = None, services: list = None):
+        if services is None:
+            services = []
         SchedulerService.__queue_service = QueueService(threads=threads)
         SchedulerService.__services = services
         SchedulerService.__services.append(SchedulerService.__queue_service)
-        threading.Thread(target=SchedulerService.__worker).start()
+        with SchedulerService.__worker_lock:
+            if not SchedulerService.__worker_started:
+                threading.Thread(
+                    target=SchedulerService.__worker,
+                    daemon=True,
+                ).start()
+                SchedulerService.__worker_started = True
 
     @staticmethod
     def get_queue_service():
@@ -49,8 +59,11 @@ class SchedulerService:
                             time_unit: TimeUnit = TimeUnit.MINUTES):
         if SchedulerService.__queue_service is None:
             SchedulerService.init()
-        thread = threading.Thread(target=SchedulerService.__start_scheduler,
-                                  args=(function, args, period, time_hh_mm, time_unit))
+        thread = threading.Thread(
+            target=SchedulerService.__start_scheduler,
+            args=(function, args, period, time_hh_mm, time_unit),
+            daemon=True,
+        )
         thread.start()
 
     @staticmethod
@@ -127,6 +140,8 @@ class SchedulerService:
 
     @staticmethod
     def put_in_queue(function, args=None, priority=False):
+        if args is None:
+            args = {}
         SchedulerService.__queue_service.put(function, priority, **args)
 
     @staticmethod

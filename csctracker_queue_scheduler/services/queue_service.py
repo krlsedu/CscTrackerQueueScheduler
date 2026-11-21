@@ -6,18 +6,22 @@ import time
 import uuid
 from queue import Queue
 
-from flask import g
+try:
+    from flask import g
+except ImportError:
+    g = None
 
 from csctracker_queue_scheduler.models.generic_data_dto import GenericDataDTO
 from csctracker_queue_scheduler.utils import Utils
 
 
 class QueueService:
-    def __init__(self, threads: int = None):
+    def __init__(self, threads: int = None, poll_interval: float = 5.0):
         self.logger = logging.getLogger()
         if threads is None:
             threads = int(os.getenv("NUM_THREADS", 10))
         self.logger.debug(f"NUM_THREADS={threads}")
+        self._poll_interval = poll_interval
         self.normal_queue = Queue()
         self.priority_queue = Queue()
         self.init_threads(threads)
@@ -37,7 +41,7 @@ class QueueService:
                 try:
                     self.__run_job(self.normal_queue, "normal")
                 except queue.Empty:
-                    time.sleep(5)
+                    time.sleep(self._poll_interval)
                 except Exception as e:
                     self.logger.error(f"Error in normal queue: {e}")
             except Exception as e:
@@ -45,28 +49,30 @@ class QueueService:
 
     def __run_job(self, queue, type):
         func_, args_, correlation_id = queue.get_nowait()
-        local = threading.current_thread()
-        local.__setattr__('correlation_id', correlation_id)
-        if func_ is not None:
-            if not args_:
-                args_ = None
-            self.logger.info(
-                f"Executing in {type} queue {Utils.get_friendly_method_name(func_)}")
-            self.logger.debug(
-                f"Executing in {type} queue {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''})")
-            if args_ is not None:
-                ret_ = func_(**args_)
+        try:
+            local = threading.current_thread()
+            local.__setattr__('correlation_id', correlation_id)
+            if func_ is not None:
+                if not args_:
+                    args_ = None
+                self.logger.info(
+                    f"Executing in {type} queue {Utils.get_friendly_method_name(func_)}")
                 self.logger.debug(
-                    f"Return of {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''}) -> {ret_}")
-            else:
-                ret_ = func_()
+                    f"Executing in {type} queue {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''})")
+                if args_ is not None:
+                    ret_ = func_(**args_)
+                    self.logger.debug(
+                        f"Return of {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''}) -> {ret_}")
+                else:
+                    ret_ = func_()
+                    self.logger.debug(
+                        f"Return of {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''}) -> {ret_}")
+                self.logger.info(
+                    f"Executed in {type} queue {Utils.get_friendly_method_name(func_)}")
                 self.logger.debug(
-                    f"Return of {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''}) -> {ret_}")
+                    f"Executed in {type} queue {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''})")
+        finally:
             queue.task_done()
-            self.logger.info(
-                f"Executed in {type} queue {Utils.get_friendly_method_name(func_)}")
-            self.logger.debug(
-                f"Executed in {type} queue {Utils.get_friendly_method_name(func_)}({args_ if args_ else ''})")
 
     def clean_queue(self) -> GenericDataDTO:
         while not self.normal_queue.empty():
@@ -92,8 +98,8 @@ class QueueService:
 
     def put(self, func, priority=False, **args):
         try:
-            correlation_id = g.correlation_id
-        except:
+            correlation_id = g.correlation_id if g is not None else str(uuid.uuid4())
+        except Exception:
             correlation_id = str(uuid.uuid4())
         if priority:
             self.priority_queue.put((func, args, correlation_id))
