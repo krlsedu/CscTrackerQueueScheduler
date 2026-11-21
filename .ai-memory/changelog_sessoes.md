@@ -11,3 +11,4 @@ updated_at: 2026-11-21
 - Removido `pytz~=2023.3.post1` não utilizado e atualizado `schedule>=1.2.2,<2` + `setup.py` (`python_requires=">=3.11"`, classifiers até `3.15`).
 - Garantido `daemon=True` e worker único no `SchedulerService`, `queue.task_done()` em `finally:` no `QueueService` e import opcional de `flask.g`.
 - Adicionados testes unitários offline em `tests/test_queue_scheduler.py`, atualizado `.github/workflows/build.yml` e provisionada governança (`/csctracker`).
+- Adicionado `MANIFEST.in` (`version.py`, `version.txt`, `requirements.txt`, `README.md`, `LICENSE`) e ajustado `description_file = README.md` no `setup.cfg`, validado localmente com `python -m build` em Python `3.15.2`.
